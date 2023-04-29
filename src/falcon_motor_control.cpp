@@ -7,9 +7,9 @@ static double leftMotorOutput = 0.0;
 static double rightMotorOutput = 0.0;
 static bool invertLeft = false;
 static bool invertRight = true;
-static double MAX_LINEAR_SPEED=0.6;
-static double MAX_ANGULAR_SPEED=0.4;
-static double RADIUS=1;
+static double RADIUS=0.8;
+static double MAX_LINEAR_SPEED=2.5;
+static double MAX_ANGULAR_SPEED=MAX_LINEAR_SPEED*RADIUS;
 
 void cmdCallback(const geometry_msgs::Twist::ConstPtr& msg)
 {
@@ -67,13 +67,13 @@ int main(int argc, char** argv)
 
     ros::Publisher fl = nh.advertise<ros_phoenix::MotorControl>("/front_left/set", 1);
     ros::Publisher fr = nh.advertise<ros_phoenix::MotorControl>("/front_right/set", 1);
-    ros::Publisher ml = nh.advertise<ros_phoenix::MotorControl>("/mid_left/set", 1);
-    ros::Publisher mr = nh.advertise<ros_phoenix::MotorControl>("/mid_right/set", 1);
+    // ros::Publisher ml = nh.advertise<ros_phoenix::MotorControl>("/mid_left/set", 1);
+    // ros::Publisher mr = nh.advertise<ros_phoenix::MotorControl>("/mid_right/set", 1);
     ros::Publisher bl = nh.advertise<ros_phoenix::MotorControl>("/back_left/set", 1);
     ros::Publisher br = nh.advertise<ros_phoenix::MotorControl>("/back_right/set", 1);
 
     // ros::Subscriber mod = nh.subscribe("joy", 1, cmdCallback);
-    float power_limit = 1; // default power_limit
+    // float power_limit = 0.05; // default power_limit
 
     ros::Rate loop_rate(50);
     while (ros::ok()) {
@@ -86,16 +86,18 @@ int main(int argc, char** argv)
 
         ros_phoenix::MotorControlPtr left(new ros_phoenix::MotorControl);
         left->mode = ros_phoenix::MotorControl::PERCENT_OUTPUT;
-        left->value = leftMotorOutput*power_limit;
+        std::cout << "left: " << leftMotorOutput<< std::endl;
+        left->value = leftMotorOutput;
         fl.publish(left);
-        ml.publish(left);
+        // ml.publish(left);
         bl.publish(left);
 
         ros_phoenix::MotorControlPtr right(new ros_phoenix::MotorControl);
         right->mode = ros_phoenix::MotorControl::PERCENT_OUTPUT;
-        right->value = rightMotorOutput*power_limit;
+        std::cout << "right: " << rightMotorOutput << std::endl;
+        right->value = rightMotorOutput;
         fr.publish(right);
-        mr.publish(right);
+        // mr.publish(right);
         br.publish(right);
 
         ros::spinOnce();
