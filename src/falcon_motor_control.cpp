@@ -87,9 +87,12 @@ int main(int argc, char** argv)
 
         if (controlMode == 1) { // front wheel drive
             fl.publish(left);
+            std::cout << "front wheel" << std::endl;
         } else if (controlMode == 0) { // back wheel drive
+            std::cout << "back wheel" << std::endl;
             bl.publish(left);
         } else { // both front and back
+            std::cout << "both" << std::endl;
             fl.publish(left);
             bl.publish(left);
         }
@@ -100,10 +103,13 @@ int main(int argc, char** argv)
         right->value = rightMotorOutput;
 
         if (controlMode == 1) { // front wheel drive
+            std::cout << "front wheel" << std::endl;
             fr.publish(right);
         } else if (controlMode == 0) { // back wheel drive
+            std::cout << "back wheel" << std::endl;
             br.publish(right);
         } else { // both front and back
+            std::cout << "both" << std::endl;
             fr.publish(right);
             br.publish(right);
         }
