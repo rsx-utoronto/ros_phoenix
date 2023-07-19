@@ -1,7 +1,8 @@
 #include "ros/ros.h"
 #include "geometry_msgs/Twist.h"
 #include "ros_phoenix/MotorControl.h"
-#include <cmath> 
+#include <cmath>
+#include <sensor_msgs/Joy.h>
 
 static double leftMotorOutput = 0.0;
 static double rightMotorOutput = 0.0;
@@ -10,6 +11,24 @@ static bool invertRight = true;
 static double RADIUS=0.8;
 static double MAX_LINEAR_SPEED=2.5;
 static double MAX_ANGULAR_SPEED=MAX_LINEAR_SPEED*RADIUS;
+
+static double controlMode = 2; // 0 = rear wheel, 1 = front wheel, 2 = both
+
+// update controller mode (front wheel, rear wheel, or both)
+void joyCallback(const sensor_msgs::Joy::ConstPtr& joy)
+{
+    // indexs for controller values
+    int rear_wheel = 0; // rear wheel drive
+    int front_wheel = 2; // front wheel drive
+
+    if (joy->buttons[rear_wheel] == 1) {
+        controlMode = 0;
+    } else if (joy->buttons[front_wheel] == 1) {
+        controlMode = 1;
+    } else { // both front and back are on
+        controlMode = 2;
+    }
+} 
 
 void cmdCallback(const geometry_msgs::Twist::ConstPtr& msg)
 {
@@ -51,6 +70,7 @@ int main(int argc, char** argv)
     ros::init(argc, argv, "falcon_motor_controller");
     ros::NodeHandle nh;
     ros::Subscriber sub = nh.subscribe("drive", 1, cmdCallback);
+    ros::Subscriber joy_sub = nh.subscribe("joy", 10, joyCallback);
 
     ros::Publisher fl = nh.advertise<ros_phoenix::MotorControl>("/front_left/set", 1);
     ros::Publisher fr = nh.advertise<ros_phoenix::MotorControl>("/front_right/set", 1);
@@ -64,15 +84,29 @@ int main(int argc, char** argv)
         left->mode = ros_phoenix::MotorControl::PERCENT_OUTPUT;
         std::cout << "left: " << leftMotorOutput<< std::endl;
         left->value = leftMotorOutput;
-        fl.publish(left);
-        bl.publish(left);
+
+        if (controlMode == 1) { // front wheel drive
+            fl.publish(left);
+        } else if (controlMode == 0) { // back wheel drive
+            bl.publish(left);
+        } else { // both front and back
+            fl.publish(left);
+            bl.publish(left);
+        }
 
         ros_phoenix::MotorControlPtr right(new ros_phoenix::MotorControl);
         right->mode = ros_phoenix::MotorControl::PERCENT_OUTPUT;
         std::cout << "right: " << rightMotorOutput << std::endl;
         right->value = rightMotorOutput;
-        fr.publish(right);
-        br.publish(right);
+
+        if (controlMode == 1) { // front wheel drive
+            fr.publish(right);
+        } else if (controlMode == 0) { // back wheel drive
+            br.publish(right);
+        } else { // both front and back
+            fr.publish(right);
+            br.publish(right);
+        }
 
         ros::spinOnce();
         loop_rate.sleep();
