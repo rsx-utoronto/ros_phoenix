@@ -137,8 +137,8 @@ int main(int argc, char** argv)
 
         ros::spinOnce();
         loop_rate.sleep();
-        lastLeftMotorOutput = leftMotorOutput;
-        lastRightMotorOutput = rightMotorOutput;
+        lastLeftMotorOutput = left->value;
+        lastRightMotorOutput = right->value;
     }
     return 0;
 }
