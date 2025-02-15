@@ -11,6 +11,7 @@ static bool invertRight = true;
 static double RADIUS=0.8;
 static double MAX_LINEAR_SPEED=2.5;
 static double MAX_ANGULAR_SPEED=MAX_LINEAR_SPEED*RADIUS;
+static double MAX_DELTA=0.1;
 
 static double controlMode = 2; // 0 = rear wheel, 1 = front wheel, 2 = both
 
@@ -78,12 +79,24 @@ int main(int argc, char** argv)
     ros::Publisher br = nh.advertise<ros_phoenix::MotorControl>("/back_right/set", 1);
 
     ros::Rate loop_rate(50);
+
+    double lastLeftMotorOutput = 0.0;
+    double lastRightMotorOutput = 0.0;
+
     while (ros::ok()) {
 
         ros_phoenix::MotorControlPtr left(new ros_phoenix::MotorControl);
         left->mode = ros_phoenix::MotorControl::PERCENT_OUTPUT;
         std::cout << "left: " << leftMotorOutput<< std::endl;
         left->value = leftMotorOutput;
+
+        if (abs(left->value - lastLeftMotorOutput) > MAX_DELTA) {
+            if (left->value > lastLeftMotorOutput) {
+                left->value = lastLeftMotorOutput + MAX_DELTA;
+            } else {
+                left->value = lastLeftMotorOutput - MAX_DELTA;
+            }
+        }
 
         if (controlMode == 1) { // front wheel drive
             fl.publish(left);
@@ -102,6 +115,14 @@ int main(int argc, char** argv)
         std::cout << "right: " << rightMotorOutput << std::endl;
         right->value = rightMotorOutput;
 
+        if (abs(right->value - lastRightMotorOutput) > MAX_DELTA) {
+            if (right->value > lastRightMotorOutput) {
+                right->value = lastRightMotorOutput + MAX_DELTA;
+            } else {
+                right->value = lastRightMotorOutput - MAX_DELTA;
+            }
+        }
+
         if (controlMode == 1) { // front wheel drive
             std::cout << "front wheel" << std::endl;
             fr.publish(right);
@@ -116,6 +137,8 @@ int main(int argc, char** argv)
 
         ros::spinOnce();
         loop_rate.sleep();
+        lastLeftMotorOutput = leftMotorOutput;
+        lastRightMotorOutput = rightMotorOutput;
     }
     return 0;
 }
