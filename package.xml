@@ -16,7 +16,10 @@
     <url type="website">https://github.com/vanderbiltrobotics/</url>
 
     <!-- dependencies -->
-    <buildtool_depend>catkin</buildtool_depend>
+    <buildtool_depend>rosidl_default_generators</buildtool_depend>
+    <exec_depend>rosidl_default_runtime</exec_depend>
+    <member_of_group>rosidl_interface_packages</member_of_group>
+    <buildtool_depend>ament_cmake_ros</buildtool_depend>
     <depend>roscpp</depend>
     <depend>geometry_msgs</depend>
     <depend>dynamic_reconfigure</depend>
@@ -25,5 +28,9 @@
     <!-- build messages -->
     <build_depend>message_generation</build_depend>
     <exec_depend>message_runtime</exec_depend>
+
+    <export>
+       <build_type>ament_cmake</build_type>
+    </export>
 
 </package>

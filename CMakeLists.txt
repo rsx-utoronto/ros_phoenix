@@ -1,7 +1,8 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.14.4)
+set(CMAKE_CXX_STANDARD 17)
 project(ros_phoenix)
 
-## Compile as C++11, supported in ROS Kinetic and newer
+## Compile as C++17, supported in ROS Kinetic and newer
 add_compile_options(-std=c++17)
 
 # Set CTRE_ARCH
@@ -63,25 +64,25 @@ macro(add_ctre_library LIB_NAME URL_NAME)
     # Mark files for installation by catkin
     install (
         FILES ${LIB_DEST}
-        DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+        DESTINATION lib
     )
     install (
         DIRECTORY ${LIB_DIR}/ctre
-        DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+        DESTINATION include/${PROJECT_NAME}
     )
 endmacro()
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED
-    COMPONENTS
-    roscpp
-    geometry_msgs
-    dynamic_reconfigure
-    roslaunch
-    message_generation
-)
+find_package(rosidl_default_generators REQUIRED)
+find_package(ament_cmake_ros REQUIRED)
+find_package(roscpp REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(dynamic_reconfigure REQUIRED)
+find_package(roslaunch REQUIRED)
+find_package(message_generation REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -112,12 +113,12 @@ find_package(Threads REQUIRED)
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-add_message_files(
-    FILES
-    MotorControl.msg
-    MotorStatus.msg
-    ArmVelocities.msg
-)
+# add_message_files(
+#     FILES
+#     MotorControl.msg
+#     MotorStatus.msg
+#     ArmVelocities.msg
+# )
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -134,7 +135,10 @@ add_message_files(
 # )
 
 ## Generate added messages and services with any dependencies listed here
-generate_messages(
+rosidl_generate_interfaces(${PROJECT_NAME}
+    "msg/MotorControl.msg"
+    "msg/MotorStatus.msg"
+    "msg/ArmVelocities.msg"
     DEPENDENCIES
     std_msgs
 )
@@ -165,10 +169,25 @@ set(PHOENIX_LIBRARIES
     CTRE_PhoenixCore
 )
 
-catkin_package(
-    INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include
-    LIBRARIES ${PHOENIX_LIBRARIES}
-    CATKIN_DEPENDS roscpp geometry_msgs dynamic_reconfigure roslaunch message_runtime
+# catkin_package(
+#     INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include
+#     LIBRARIES ${PHOENIX_LIBRARIES}
+#     CATKIN_DEPENDS roscpp geometry_msgs dynamic_reconfigure roslaunch message_runtime
+# )
+
+install(TARGETS ros_phoenix EXPORT export_ros_phoenix
+   ARCHIVE DESTINATION lib
+   LIBRARY DESTINATION lib
+   RUNTIME DESTINATION bin
+)
+
+ament_export_dependencies(
+    roscpp
+    std_msgs
+    geometry_msgs
+    dynamic_reconfigure
+    roslaunch
+    message_runtime
 )
 
 # Download the CTRE libraries
@@ -185,10 +204,14 @@ add_ctre_library(CTRE_PhoenixCore               core)
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    SYSTEM ${catkin_INCLUDE_DIRS}
-)
+# include_directories(
+#     ${CMAKE_CURRENT_SOURCE_DIR}/include
+#     SYSTEM ${catkin_INCLUDE_DIRS}
+# )
+
+target_include_directories(ros_phoenix PUBLIC
+   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+   "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
@@ -234,43 +257,43 @@ add_dependencies(fake_ros_phoenix_node ${PROJECT_NAME}_gencfg ${${PROJECT_NAME}_
 #add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(ros_phoenix_cmd_example
-    ${catkin_LIBRARIES}
+target_link_libraries(ros_phoenix_cmd_example PUBLIC
+    # ${catkin_LIBRARIES}
     Threads::Threads
     ${PHOENIX_LIBRARIES}
 )
-target_link_libraries(ros_phoenix_fd_teleop
-    ${catkin_LIBRARIES}
+target_link_libraries(ros_phoenix_fd_teleop PUBLIC
+    # ${catkin_LIBRARIES}
     Threads::Threads
     ${PHOENIX_LIBRARIES}
 )
-target_link_libraries(ros_phoenix_arm_command
-    ${catkin_LIBRARIES}
+target_link_libraries(ros_phoenix_arm_command PUBLIC
+    # ${catkin_LIBRARIES}
     Threads::Threads
     ${PHOENIX_LIBRARIES}
 )
-target_link_libraries(ros_phoenix_deposition_command
-    ${catkin_LIBRARIES}
+target_link_libraries(ros_phoenix_deposition_command PUBLIC
+    # ${catkin_LIBRARIES}
     Threads::Threads
     ${PHOENIX_LIBRARIES}
 )
-target_link_libraries(falcon_motor_control_node
-    ${catkin_LIBRARIES}
+target_link_libraries(falcon_motor_control_node PUBLIC
+    # ${catkin_LIBRARIES}
     Threads::Threads
     ${PHOENIX_LIBRARIES}
 )
-target_link_libraries(falcon_motor_control_test_node
-    ${catkin_LIBRARIES}
+target_link_libraries(falcon_motor_control_test_node PUBLIC
+    # ${catkin_LIBRARIES}
     Threads::Threads
     ${PHOENIX_LIBRARIES}
 )
-target_link_libraries(ros_phoenix_node
-    ${catkin_LIBRARIES}
+target_link_libraries(ros_phoenix_node PUBLIC
+    # ${catkin_LIBRARIES}
     Threads::Threads
     ${PHOENIX_LIBRARIES}
 )
-target_link_libraries(fake_ros_phoenix_node
-    ${catkin_LIBRARIES}
+target_link_libraries(fake_ros_phoenix_node PUBLIC
+    # ${catkin_LIBRARIES}
     Threads::Threads
     ${PHOENIX_LIBRARIES}
 )
@@ -282,23 +305,27 @@ target_link_libraries(fake_ros_phoenix_node
 ## Install python scripts
 catkin_install_python(PROGRAMS
     scripts/box_testing.py
-    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+    DESTINATION lib/${PROJECT_NAME}
 )
 
 ## Install node executables
 install(TARGETS fake_ros_phoenix_node ros_phoenix_node ros_phoenix_fd_teleop ros_phoenix_cmd_example ros_phoenix_arm_command ros_phoenix_deposition_command
-    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 ## Mark cpp header files for installation
 install(DIRECTORY include/ros_phoenix/
-    DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+    DESTINATION include/${PROJECT_NAME}
     FILES_MATCHING PATTERN "*.h"
     PATTERN ".svn" EXCLUDE
 )
 ## Mark launch files for installation
 install(DIRECTORY launch/
-    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
+    DESTINATION share/${PROJECT_NAME}/launch
     PATTERN ".svn" EXCLUDE
 )
+
+ament_export_targets(export_ros_phoenix)
+
+ament_package()
