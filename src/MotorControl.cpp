@@ -18,7 +18,14 @@ int main(int argc, char** argv)
 
   // Parameters
   const auto can_interface = node->declare_parameter<std::string>("can_interface", "can0");
-  const auto talon_names = node->declare_parameter<std::vector<std::string>>("talons", {});
+  // const auto talon_names = node->declare_parameter<std::vector<std::string>>("talons", {});
+
+
+  // Do this:
+  const auto talon_names = node->declare_parameter<std::vector<std::string>>(
+      "talons",
+      std::vector<std::string>{}
+  );
 
   // Set CAN interface for CTRE Phoenix
   ctre::phoenix::platform::can::SetCANInterface(can_interface.c_str());
