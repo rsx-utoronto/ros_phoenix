@@ -1,0 +1,30 @@
+ros_phoenix:
+  ros__parameters:
+    can_interface: "can0"
+    talons: [left, right]
+
+    talons.left.id: 1
+    talons.left.inverted: false
+    talons.left.peak_voltage: 12.0
+    talons.left.pot: false
+    talons.left.invert_sensor: false
+    talons.left.p: 0.0
+    talons.left.i: 0.0
+    talons.left.d: 0.0
+    talons.left.f: 0.0
+    talons.left.cont_current: 30
+    talons.left.peak_current_dur: 100
+    talons.left.brake_mode: true
+
+    talons.right.id: 2
+    talons.right.inverted: true
+    talons.right.peak_voltage: 12.0
+    talons.right.pot: false
+    talons.right.invert_sensor: false
+    talons.right.p: 0.0
+    talons.right.i: 0.0
+    talons.right.d: 0.0
+    talons.right.f: 0.0
+    talons.right.cont_current: 30
+    talons.right.peak_current_dur: 100
+    talons.right.brake_mode: true

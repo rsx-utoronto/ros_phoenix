@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.14.4)
 set(CMAKE_CXX_STANDARD 17)
 project(ros_phoenix)
 
-## Compile as C++17, supported in ROS Kinetic and newer
+## Compile as C++17, supported in ROS 2
 add_compile_options(-std=c++17)
 
 # Set CTRE_ARCH
@@ -18,7 +18,7 @@ endif()
 
 set(CTRE_VERSION "5.19.4")
 
-# Macro for downloading CTRE Libraries
+# Macro for downloading CTRE Libraries (keep existing macro)
 macro(add_ctre_library LIB_NAME URL_NAME)
     SET(LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/ctre/${CTRE_VERSION}/${URL_NAME}")
     SET(LIB_DEST "${LIB_DIR}/linux/${CTRE_ARCH}/static/lib${LIB_NAME}.a")
@@ -61,7 +61,7 @@ macro(add_ctre_library LIB_NAME URL_NAME)
         INTERFACE_INCLUDE_DIRECTORIES ${LIB_DIR}
     )
 
-    # Mark files for installation by catkin
+    # Mark files for installation
     install (
         FILES ${LIB_DEST}
         DESTINATION lib
@@ -72,94 +72,27 @@ macro(add_ctre_library LIB_NAME URL_NAME)
     )
 endmacro()
 
-## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
-find_package(rosidl_default_generators REQUIRED)
-find_package(ament_cmake_ros REQUIRED)
-find_package(roscpp REQUIRED)
+## Find ROS 2 packages
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
-find_package(dynamic_reconfigure REQUIRED)
-find_package(roslaunch REQUIRED)
-find_package(message_generation REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(sensor_msgs REQUIRED)  # NEW
 
-## System dependencies are found with CMake's conventions
-# find_package(Boost REQUIRED COMPONENTS system)
+## System dependencies
 find_package(Threads REQUIRED)
 
-################################################
-## Declare ROS messages, services and actions ##
-################################################
-
-## To declare and build messages, services or actions from within this
-## package, follow these steps:
-## * Let MSG_DEP_SET be the set of packages whose message types you use in
-##   your messages/services/actions (e.g. std_msgs, actionlib_msgs, ...).
-## * In the file package.xml:
-##   * add a build_depend tag for "message_generation"
-##   * add a build_depend and a exec_depend tag for each package in MSG_DEP_SET
-##   * If MSG_DEP_SET isn't empty the following dependency has been pulled in
-##     but can be declared for certainty nonetheless:
-##     * add a exec_depend tag for "message_runtime"
-## * In this file (CMakeLists.txt):
-##   * add "message_generation" and every package in MSG_DEP_SET to
-##     find_package(catkin REQUIRED COMPONENTS ...)
-##   * add "message_runtime" and every package in MSG_DEP_SET to
-##     catkin_package(CATKIN_DEPENDS ...)
-##   * uncomment the add_*_files sections below as needed
-##     and list every .msg/.srv/.action file to be processed
-##   * uncomment the generate_messages entry below
-##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
-
-## Generate messages in the 'msg' folder
-# add_message_files(
-#     FILES
-#     MotorControl.msg
-#     MotorStatus.msg
-#     ArmVelocities.msg
-# )
-
-## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
-
-## Generate actions in the 'action' folder
-# add_action_files(
-#   FILES
-#   Action1.action
-#   Action2.action
-# )
-
-## Generate added messages and services with any dependencies listed here
+## Generate messages
 rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/MotorControl.msg"
     "msg/MotorStatus.msg"
     "msg/ArmVelocities.msg"
+    "msg/TalonConfig.msg"
     DEPENDENCIES
     std_msgs
 )
 
-## add dynamic reconfigure api
-generate_dynamic_reconfigure_options(
-    ${PROJECT_SOURCE_DIR}/cfg/Talon.cfg
-)
-
-## Generate launch files
-roslaunch_add_file_check(${PROJECT_SOURCE_DIR}/launch/example.launch)
-
-###################################
-## catkin specific configuration ##
-###################################
-## The catkin_package macro generates cmake config files for your package
-## Declare things to be passed to dependent projects
-## INCLUDE_DIRS: uncomment this if your package contains header files
-## LIBRARIES: libraries you create in this project that dependent projects also need
-## CATKIN_DEPENDS: catkin_packages dependent projects also need
-## DEPENDS: system dependencies of this project that dependent projects also need
 set(PHOENIX_LIBRARIES
     CTRE_Phoenix
     CTRE_PhoenixCCI
@@ -167,27 +100,6 @@ set(PHOENIX_LIBRARIES
     CTRE_PhoenixPlatform_socketcan
     CTRE_PhoenixCanutils
     CTRE_PhoenixCore
-)
-
-# catkin_package(
-#     INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include
-#     LIBRARIES ${PHOENIX_LIBRARIES}
-#     CATKIN_DEPENDS roscpp geometry_msgs dynamic_reconfigure roslaunch message_runtime
-# )
-
-install(TARGETS ros_phoenix EXPORT export_ros_phoenix
-   ARCHIVE DESTINATION lib
-   LIBRARY DESTINATION lib
-   RUNTIME DESTINATION bin
-)
-
-ament_export_dependencies(
-    roscpp
-    std_msgs
-    geometry_msgs
-    dynamic_reconfigure
-    roslaunch
-    message_runtime
 )
 
 # Download the CTRE libraries
@@ -198,134 +110,63 @@ add_ctre_library(CTRE_PhoenixPlatform_socketcan platform-socketcan)
 add_ctre_library(CTRE_PhoenixCanutils           canutils)
 add_ctre_library(CTRE_PhoenixCore               core)
 
-###########
-## Build ##
-###########
-
-## Specify additional locations of header files
-## Your package locations should be listed before other locations
-# include_directories(
-#     ${CMAKE_CURRENT_SOURCE_DIR}/include
-#     SYSTEM ${catkin_INCLUDE_DIRS}
+## Build executables
+# Comment out ROS 1 executables (migrate later)
+# add_executable(ros_phoenix_cmd_example ${PROJECT_SOURCE_DIR}/src/CmdExmaple.cpp)
+# ament_target_dependencies(ros_phoenix_cmd_example rclcpp std_msgs geometry_msgs)
+# add_executable(ros_phoenix_fd_teleop ${PROJECT_SOURCE_DIR}/src/FDTeleop.cpp)
+# ament_target_dependencies(ros_phoenix_fd_teleop rclcpp std_msgs geometry_msgs)
+# add_executable(ros_phoenix_arm_command ${PROJECT_SOURCE_DIR}/src/ArmCommand.cpp)
+# ament_target_dependencies(ros_phoenix_arm_command rclcpp std_msgs geometry_msgs)
+# add_executable(ros_phoenix_deposition_command ${PROJECT_SOURCE_DIR}/src/DepositionCommand.cpp)
+# ament_target_dependencies(ros_phoenix_deposition_command rclcpp std_msgs geometry_msgs)
+# add_executable(falcon_motor_control_test_node ${PROJECT_SOURCE_DIR}/src/falcon_motor_control_test.cpp)
+# ament_target_dependencies(falcon_motor_control_test_node rclcpp std_msgs geometry_msgs)
+# add_executable(fake_ros_phoenix_node
+#   ${PROJECT_SOURCE_DIR}/src/FakeTalonNode.cpp
+#   ${PROJECT_SOURCE_DIR}/src/FakeMotorControl.cpp
 # )
+# ament_target_dependencies(fake_ros_phoenix_node rclcpp std_msgs geometry_msgs)
 
-target_include_directories(ros_phoenix PUBLIC
-   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-   "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
-
-## Declare a C++ executable
-## With catkin_make all packages are built within a single CMake context
-## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/phoenix_node.cpp)
-#add_executable(phoenix_node ${PROJECT_SOURCE_DIR}/example.cpp)
-add_executable(ros_phoenix_cmd_example ${PROJECT_SOURCE_DIR}/src/CmdExmaple.cpp)
-add_dependencies(ros_phoenix_cmd_example ${PROJECT_NAME}_gencfg ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-add_executable(ros_phoenix_fd_teleop ${PROJECT_SOURCE_DIR}/src/FDTeleop.cpp)
-add_dependencies(ros_phoenix_fd_teleop ${PROJECT_NAME}_gencfg ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-add_executable(ros_phoenix_arm_command ${PROJECT_SOURCE_DIR}/src/ArmCommand.cpp)
-add_dependencies(ros_phoenix_arm_command ${PROJECT_NAME}_gencfg ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-add_executable(ros_phoenix_deposition_command ${PROJECT_SOURCE_DIR}/src/DepositionCommand.cpp)
-add_dependencies(ros_phoenix_deposition_command ${PROJECT_NAME}_gencfg ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-add_executable(falcon_motor_control_test_node 
-    ${PROJECT_SOURCE_DIR}/src/falcon_motor_control_test.cpp
-)
-add_dependencies(falcon_motor_control_test_node ${PROJECT_NAME}_gencfg ${${PROEJCT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-add_executable(falcon_motor_control_node 
-    ${PROJECT_SOURCE_DIR}/src/falcon_motor_control.cpp
-)
-add_dependencies(falcon_motor_control_node ${PROJECT_NAME}_gencfg ${${PROEJCT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_executable(falcon_motor_control_node ${PROJECT_SOURCE_DIR}/src/falcon_motor_control.cpp)
+ament_target_dependencies(falcon_motor_control_node rclcpp std_msgs geometry_msgs sensor_msgs)
+target_include_directories(falcon_motor_control_node PUBLIC ${PROJECT_SOURCE_DIR}/include)
+rosidl_target_interfaces(falcon_motor_control_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 add_executable(ros_phoenix_node
-    ${PROJECT_SOURCE_DIR}/src/TalonNode.cpp
-    ${PROJECT_SOURCE_DIR}/src/MotorControl.cpp
+  ${PROJECT_SOURCE_DIR}/src/TalonNode.cpp
+  ${PROJECT_SOURCE_DIR}/src/MotorControl.cpp
 )
-add_dependencies(ros_phoenix_node ${PROJECT_NAME}_gencfg ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+ament_target_dependencies(ros_phoenix_node rclcpp std_msgs geometry_msgs sensor_msgs)
+target_include_directories(ros_phoenix_node PUBLIC ${PROJECT_SOURCE_DIR}/include)
+rosidl_target_interfaces(ros_phoenix_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
-add_executable(fake_ros_phoenix_node
-    ${PROJECT_SOURCE_DIR}/src/FakeTalonNode.cpp
-    ${PROJECT_SOURCE_DIR}/src/FakeMotorControl.cpp
-)
-add_dependencies(fake_ros_phoenix_node ${PROJECT_NAME}_gencfg ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+## Link libraries
+# Remove links for the ROS 1 targets you commented out
+target_link_libraries(falcon_motor_control_node Threads::Threads ${PHOENIX_LIBRARIES})
+target_link_libraries(ros_phoenix_node Threads::Threads ${PHOENIX_LIBRARIES})
 
-## Add cmake target dependencies of the executable
-## same as for the library above
-#add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-## Specify libraries to link a library or executable target against
-target_link_libraries(ros_phoenix_cmd_example PUBLIC
-    # ${catkin_LIBRARIES}
-    Threads::Threads
-    ${PHOENIX_LIBRARIES}
-)
-target_link_libraries(ros_phoenix_fd_teleop PUBLIC
-    # ${catkin_LIBRARIES}
-    Threads::Threads
-    ${PHOENIX_LIBRARIES}
-)
-target_link_libraries(ros_phoenix_arm_command PUBLIC
-    # ${catkin_LIBRARIES}
-    Threads::Threads
-    ${PHOENIX_LIBRARIES}
-)
-target_link_libraries(ros_phoenix_deposition_command PUBLIC
-    # ${catkin_LIBRARIES}
-    Threads::Threads
-    ${PHOENIX_LIBRARIES}
-)
-target_link_libraries(falcon_motor_control_node PUBLIC
-    # ${catkin_LIBRARIES}
-    Threads::Threads
-    ${PHOENIX_LIBRARIES}
-)
-target_link_libraries(falcon_motor_control_test_node PUBLIC
-    # ${catkin_LIBRARIES}
-    Threads::Threads
-    ${PHOENIX_LIBRARIES}
-)
-target_link_libraries(ros_phoenix_node PUBLIC
-    # ${catkin_LIBRARIES}
-    Threads::Threads
-    ${PHOENIX_LIBRARIES}
-)
-target_link_libraries(fake_ros_phoenix_node PUBLIC
-    # ${catkin_LIBRARIES}
-    Threads::Threads
-    ${PHOENIX_LIBRARIES}
+## Install targets
+install(TARGETS 
+  ros_phoenix_node 
+  falcon_motor_control_node
+  DESTINATION lib/${PROJECT_NAME}
 )
 
-#############
-## Install ##
-#############
-
-## Install python scripts
-catkin_install_python(PROGRAMS
+install(PROGRAMS
     scripts/box_testing.py
     DESTINATION lib/${PROJECT_NAME}
 )
 
-## Install node executables
-install(TARGETS fake_ros_phoenix_node ros_phoenix_node ros_phoenix_fd_teleop ros_phoenix_cmd_example ros_phoenix_arm_command ros_phoenix_deposition_command
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION lib/${PROJECT_NAME}
-)
-## Mark cpp header files for installation
 install(DIRECTORY include/ros_phoenix/
     DESTINATION include/${PROJECT_NAME}
     FILES_MATCHING PATTERN "*.h"
     PATTERN ".svn" EXCLUDE
 )
-## Mark launch files for installation
+
 install(DIRECTORY launch/
     DESTINATION share/${PROJECT_NAME}/launch
     PATTERN ".svn" EXCLUDE
 )
-
-ament_export_targets(export_ros_phoenix)
 
 ament_package()

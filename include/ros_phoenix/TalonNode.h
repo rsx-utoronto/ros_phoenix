@@ -1,57 +1,76 @@
 #ifndef ROS_PHOENIX_TALONNODE_H
 #define ROS_PHOENIX_TALONNODE_H
 
-#define Phoenix_No_WPI // remove WPI dependencies
+#define Phoenix_No_WPI
 #include "ctre/Phoenix.h"
 #include "ctre/phoenix/platform/Platform.h"
 #include "ctre/phoenix/unmanaged/Unmanaged.h"
 
-#include "ros_phoenix/TalonConfig.h"
-#include "ros_phoenix/MotorControl.h"
-#include "ros_phoenix/MotorStatus.h"
+#include "ros_phoenix/msg/talon_config.hpp"  // Update this header to be ROS 2 friendly (no dynamic_reconfigure)
+#include "ros_phoenix/msg/motor_control.hpp"
+#include "ros_phoenix/msg/motor_status.hpp"
 
+#include <rclcpp/rclcpp.hpp>
+#include <mutex>
 #include <string>
-#include <dynamic_reconfigure/server.h>
-#include <ros/ros.h>
 
 namespace ros_phoenix {
+
 class TalonNode {
 private:
-    boost::recursive_mutex mutex;
-    ros::NodeHandle nh;
-    std::string _name;
-    dynamic_reconfigure::Server<TalonConfig> server;
-    TalonConfig _config;
+  // Thread-safety
+  std::recursive_mutex mutex_;
 
-    TalonSRX talon;
+  // ROS 2 node
+  rclcpp::Node::SharedPtr node_;
+  std::string name_;
 
-    ros::Publisher statusPub;
+  // Config (replace dynamic_reconfigure with parameters or a plain struct)
+  ros_phoenix::msg::TalonConfig config_;
 
-    ros::Subscriber setSub;
+  // CTRE device
+  TalonSRX talon;
 
-    ros::Time lastUpdate;
-    ControlMode _controlMode;
-    double _output;
-    bool disabled;
-    bool configured;
-    bool not_configured_warned;
+  // Pub/Sub
+  rclcpp::Publisher<ros_phoenix::msg::MotorStatus>::SharedPtr status_pub_;
+  rclcpp::Subscription<ros_phoenix::msg::MotorControl>::SharedPtr set_sub_;
+
+  // Timing and state
+  rclcpp::Time last_update_;
+  ControlMode control_mode_;
+  double output_;
+  bool disabled_;
+  bool configured_;
+  bool not_configured_warned_;
+
+  // Optional: update loop timer
+  rclcpp::TimerBase::SharedPtr update_timer_;
+
+  // Optional: parameter callback (ROS 2 replacement for dynamic_reconfigure)
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_cb_handle_;
 
 public:
-    TalonNode(const ros::NodeHandle& parent, const std::string& name, int id, const TalonConfig& config);
+  TalonNode(const rclcpp::Node::SharedPtr& node,
+            const std::string& name,
+            int id,
+            const ros_phoenix::msg::TalonConfig& config);
 
-    TalonNode& operator=(const TalonNode&) = delete;
+  TalonNode& operator=(const TalonNode&) = delete;
+  ~TalonNode() = default;
 
-    ~TalonNode() = default;
+  // Reconfigure without dynamic_reconfigure (apply new config directly or via params)
+  void reconfigure(const ros_phoenix::msg::TalonConfig& config);
 
-    void reconfigure(const TalonConfig& config, uint32_t level);
+  // Apply current config to hardware
+  void configure();
 
-    void configure();
+  // ROS 2 message callback
+  void set(const ros_phoenix::msg::MotorControl::SharedPtr msg);
 
-    void set(MotorControl output);
+  // Periodic update (publish status, watchdog, etc.)
+  void update();
 
-    void update();
-
-    void configureStatusPeriod();
+  void configureStatusPeriod();
 };
 
 } // namespace ros_phoenix

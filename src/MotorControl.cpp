@@ -1,65 +1,64 @@
-#include "ros_phoenix/TalonNode.h"
-#include <ros/ros.h>
+#include <memory>
+#include <string>
+#include <vector>
+#include <chrono>
 
-using namespace ros_phoenix;
+#include <rclcpp/rclcpp.hpp>
+#include "ros_phoenix/TalonNode.h"
+#include "ctre/phoenix/platform/Platform.h"
+#include "ctre/phoenix/unmanaged/Unmanaged.h"
+
+using ros_phoenix::TalonNode;
+using std::chrono::milliseconds;
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "ros_phoenix");
-    ros::NodeHandle nh;
-    std::vector<std::unique_ptr<TalonNode>> talons;
+  rclcpp::init(argc, argv);
+  auto node = rclcpp::Node::make_shared("ros_phoenix");
 
-    // Need to set this so that phoenix knows what interface to use
-    std::string interface = "can0";
-    ctre::phoenix::platform::can::SetCANInterface(interface.c_str());
+  // Parameters
+  const auto can_interface = node->declare_parameter<std::string>("can_interface", "can0");
+  const auto talon_names = node->declare_parameter<std::vector<std::string>>("talons", {});
 
-    XmlRpc::XmlRpcValue v;
-    nh.getParam("talons", v);
-    std::for_each(v.begin(), v.end(), [&nh, &talons](auto p) {
-        const std::string name(p.first);
-        XmlRpc::XmlRpcValue v(p.second);
-        if (v.getType() == XmlRpc::XmlRpcValue::TypeStruct) {
-            TalonConfig config; // Generated from Talon.cfg
-            dynamic_reconfigure::Server<TalonConfig>().getConfigDefault(config);
-            if (v.hasMember("id")) {
-                int id = v["id"];
-                if (v.hasMember("inverted"))
-                    config.inverted = (bool)v["inverted"];
-                if (v.hasMember("peak_voltage"))
-                    config.peak_voltage = (double)v["peak_voltage"];
-                if (v.hasMember("pot"))
-                    config.pot = (bool)v["pot"];
-                if (v.hasMember("invert_sensor"))
-                    config.invert_sensor = (bool)v["invert_sensor"];
-                if (v.hasMember("P"))
-                    config.P = (double)v["P"];
-                if (v.hasMember("I"))
-                    config.I = (double)v["I"];
-                if (v.hasMember("D"))
-                    config.D = (double)v["D"];
-                if (v.hasMember("F"))
-                    config.F = (double)v["F"];
+  // Set CAN interface for CTRE Phoenix
+  ctre::phoenix::platform::can::SetCANInterface(can_interface.c_str());
 
-                auto node = ros::NodeHandle(nh, name);
-                talons.push_back(std::make_unique<TalonNode>(node, name, id, config));
-                ROS_INFO("Created Talon with name '%s' and id '%d'", name.c_str(), id);
-            } else {
-                ROS_WARN("Failed to create Talon '%s' with missing ID number!", name.c_str());
-            }
-        } else {
-            ROS_INFO("Unrecognized Talon XML member: %s", v.toXml().c_str());
-        }
-    });
+  // Build Talons from parameters
+  std::vector<std::unique_ptr<TalonNode>> talons;
+  talons.reserve(talon_names.size());
 
-    ros::Rate loop_rate(50);
-    while (ros::ok()) {
-        ctre::phoenix::unmanaged::Unmanaged::FeedEnable(100);
+  for (const auto& name : talon_names) {
+    const std::string pfx = "talons." + name + ".";
 
-        // There should be a better way of doing this
-        std::for_each(talons.begin(), talons.end(), [](std::unique_ptr<TalonNode>& talon) { talon->update(); });
-
-        ros::spinOnce();
-        loop_rate.sleep();
+    int id = node->declare_parameter<int>(pfx + "id", -1);
+    if (id < 0) {
+      RCLCPP_WARN(node->get_logger(), "Skipping Talon '%s': missing/invalid id", name.c_str());
+      continue;
     }
-    return 0;
+
+    ros_phoenix::msg::TalonConfig cfg{};
+    cfg.inverted          = node->declare_parameter<bool>(pfx + "inverted", false);
+    cfg.peak_voltage      = node->declare_parameter<double>(pfx + "peak_voltage", 12.0);
+    cfg.pot               = node->declare_parameter<bool>(pfx + "pot", false);
+    cfg.invert_sensor     = node->declare_parameter<bool>(pfx + "invert_sensor", false);
+    cfg.p                 = node->declare_parameter<double>(pfx + "p", 0.0);
+    cfg.i                 = node->declare_parameter<double>(pfx + "i", 0.0);
+    cfg.d                 = node->declare_parameter<double>(pfx + "d", 0.0);
+    cfg.f                 = node->declare_parameter<double>(pfx + "f", 0.0);
+    cfg.cont_current      = node->declare_parameter<int>(pfx + "cont_current", 0);
+    cfg.peak_current_dur  = node->declare_parameter<int>(pfx + "peak_current_dur", 0);
+    cfg.brake_mode        = node->declare_parameter<bool>(pfx + "brake_mode", true);
+
+    talons.emplace_back(std::make_unique<TalonNode>(node, name, id, cfg));
+    RCLCPP_INFO(node->get_logger(), "Created Talon '%s' id=%d", name.c_str(), id);
+  }
+
+  // Keep CTRE enabled (similar to ROS 1 Unmanaged::FeedEnable loop)
+  auto feed_timer = node->create_wall_timer(
+      milliseconds(20),
+      [] { ctre::phoenix::unmanaged::Unmanaged::FeedEnable(100); });
+
+  rclcpp::spin(node);
+  rclcpp::shutdown();
+  return 0;
 }

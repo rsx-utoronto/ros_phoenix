@@ -1,144 +1,147 @@
-#include "ros/ros.h"
-#include "geometry_msgs/Twist.h"
-#include "ros_phoenix/MotorControl.h"
+#include <algorithm>
 #include <cmath>
-#include <sensor_msgs/Joy.h>
+#include <chrono>
+#include <memory>
+#include <string>
 
-static double leftMotorOutput = 0.0;
-static double rightMotorOutput = 0.0;
-static bool invertLeft = false;
-static bool invertRight = true;
-static double RADIUS=0.8;
-static double MAX_LINEAR_SPEED=2.5;
-static double MAX_ANGULAR_SPEED=MAX_LINEAR_SPEED*RADIUS;
-static double MAX_DELTA=0.05;
+#include <rclcpp/rclcpp.hpp>
+#include <geometry_msgs/msg/twist.hpp>
+#include <sensor_msgs/msg/joy.hpp>
+#include "ros_phoenix/msg/motor_control.hpp"
 
-static double controlMode = 2; // 0 = rear wheel, 1 = front wheel, 2 = both
+using std::placeholders::_1;
+using namespace std::chrono_literals;
 
-// update controller mode (front wheel, rear wheel, or both)
-void joyCallback(const sensor_msgs::Joy::ConstPtr& joy)
-{
-    // indexs for controller values
-    int rear_wheel = 0; // rear wheel drive
-    int front_wheel = 2; // front wheel drive
+class FalconMotorController : public rclcpp::Node {
+public:
+  FalconMotorController() : rclcpp::Node("falcon_motor_controller") {
+    // Params (tunable)
+    radius_            = this->declare_parameter<double>("radius", 0.8);
+    max_linear_speed_  = this->declare_parameter<double>("max_linear_speed", 2.5);
+    max_delta_         = this->declare_parameter<double>("max_delta", 0.05);
 
-    if (joy->buttons[rear_wheel] == 1) {
-        controlMode = 0;
-    } else if (joy->buttons[front_wheel] == 1) {
-        controlMode = 1;
-    } else { // both front and back are on
-        controlMode = 2;
-    }
-} 
+    max_angular_speed_ = max_linear_speed_ * radius_;
 
-void cmdCallback(const geometry_msgs::Twist::ConstPtr& msg)
-{
-    double moveValue = msg->linear.x/MAX_LINEAR_SPEED;
-    double rotateValue = RADIUS*(msg->angular.z/MAX_ANGULAR_SPEED);
+    // Subs
+    cmd_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
+      "drive", 1, std::bind(&FalconMotorController::cmdCallback, this, _1));
+    joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
+      "joy", 10, std::bind(&FalconMotorController::joyCallback, this, _1));
 
-    if(std::abs(moveValue)>1 || std::abs(rotateValue)>1) {
-        if(std::abs(moveValue)>std::abs(rotateValue)) {
-            moveValue=moveValue/std::abs(moveValue);
-            rotateValue=rotateValue/std::abs(moveValue);
-        } else {
-            moveValue=moveValue/std::abs(rotateValue);
-            rotateValue=rotateValue/std::abs(rotateValue);
-        }
-    }
+    // Pubs (kept same topic names as ROS 1; remove leading '/' if you prefer namespaced topics)
+    pub_fl_ = this->create_publisher<ros_phoenix::msg::MotorControl>("/front_left/set", 1);
+    pub_fr_ = this->create_publisher<ros_phoenix::msg::MotorControl>("/front_right/set", 1);
+    pub_bl_ = this->create_publisher<ros_phoenix::msg::MotorControl>("/back_left/set", 1);
+    pub_br_ = this->create_publisher<ros_phoenix::msg::MotorControl>("/back_right/set", 1);
 
-    if (moveValue > 0.0) {
-        if (rotateValue > 0.0) {
-            leftMotorOutput = moveValue - rotateValue;
-            rightMotorOutput = std::max(moveValue, rotateValue);
-        } else {
-            leftMotorOutput = std::max(moveValue, -rotateValue);
-            rightMotorOutput = moveValue + rotateValue;
-        }
+    // 50 Hz timer to publish
+    timer_ = this->create_wall_timer(20ms, std::bind(&FalconMotorController::publishLoop, this));
+  }
+
+private:
+  // Callbacks
+  void joyCallback(const sensor_msgs::msg::Joy::SharedPtr joy) {
+    // 0: rear, 2: front; else both
+    const int rear_wheel_btn = 0;
+    const int front_wheel_btn = 2;
+
+    if (rear_wheel_btn < static_cast<int>(joy->buttons.size()) && joy->buttons[rear_wheel_btn] == 1) {
+      control_mode_ = 0;
+    } else if (front_wheel_btn < static_cast<int>(joy->buttons.size()) && joy->buttons[front_wheel_btn] == 1) {
+      control_mode_ = 1;
     } else {
-        if (rotateValue > 0.0) {
-            leftMotorOutput = -std::max(-moveValue, rotateValue);
-            rightMotorOutput = moveValue + rotateValue;
-        } else {
-            leftMotorOutput = moveValue - rotateValue;
-            rightMotorOutput = -std::max(-moveValue, -rotateValue);
-        }
+      control_mode_ = 2;
     }
-    ROS_INFO("Move=%f Rotate=%f", moveValue, rotateValue);
-}
+  }
 
-int main(int argc, char** argv)
-{
-    ros::init(argc, argv, "falcon_motor_controller");
-    ros::NodeHandle nh;
-    ros::Subscriber sub = nh.subscribe("drive", 1, cmdCallback);
-    ros::Subscriber joy_sub = nh.subscribe("joy", 10, joyCallback);
+  void cmdCallback(const geometry_msgs::msg::Twist::SharedPtr msg) {
+    double move = msg->linear.x / max_linear_speed_;
+    double rotate = radius_ * (msg->angular.z / max_angular_speed_);
 
-    ros::Publisher fl = nh.advertise<ros_phoenix::MotorControl>("/front_left/set", 1);
-    ros::Publisher fr = nh.advertise<ros_phoenix::MotorControl>("/front_right/set", 1);
-    ros::Publisher bl = nh.advertise<ros_phoenix::MotorControl>("/back_left/set", 1);
-    ros::Publisher br = nh.advertise<ros_phoenix::MotorControl>("/back_right/set", 1);
-
-    ros::Rate loop_rate(50);
-
-    double lastLeftMotorOutput = 0.0;
-    double lastRightMotorOutput = 0.0;
-
-    while (ros::ok()) {
-
-        ros_phoenix::MotorControlPtr left(new ros_phoenix::MotorControl);
-        left->mode = ros_phoenix::MotorControl::PERCENT_OUTPUT;
-        std::cout << "left: " << leftMotorOutput<< std::endl;
-        left->value = leftMotorOutput;
-
-        if (abs(left->value - lastLeftMotorOutput) > MAX_DELTA) {
-            if (left->value > lastLeftMotorOutput) {
-                left->value = lastLeftMotorOutput + MAX_DELTA;
-            } else {
-                left->value = lastLeftMotorOutput - MAX_DELTA;
-            }
-        }
-
-        if (controlMode == 1) { // front wheel drive
-            fl.publish(left);
-            std::cout << "front wheel" << std::endl;
-        } else if (controlMode == 0) { // back wheel drive
-            std::cout << "back wheel" << std::endl;
-            bl.publish(left);
-        } else { // both front and back
-            std::cout << "both" << std::endl;
-            fl.publish(left);
-            bl.publish(left);
-        }
-
-        ros_phoenix::MotorControlPtr right(new ros_phoenix::MotorControl);
-        right->mode = ros_phoenix::MotorControl::PERCENT_OUTPUT;
-        std::cout << "right: " << rightMotorOutput << std::endl;
-        right->value = rightMotorOutput;
-
-        if (abs(right->value - lastRightMotorOutput) > MAX_DELTA) {
-            if (right->value > lastRightMotorOutput) {
-                right->value = lastRightMotorOutput + MAX_DELTA;
-            } else {
-                right->value = lastRightMotorOutput - MAX_DELTA;
-            }
-        }
-
-        if (controlMode == 1) { // front wheel drive
-            std::cout << "front wheel" << std::endl;
-            fr.publish(right);
-        } else if (controlMode == 0) { // back wheel drive
-            std::cout << "back wheel" << std::endl;
-            br.publish(right);
-        } else { // both front and back
-            std::cout << "both" << std::endl;
-            fr.publish(right);
-            br.publish(right);
-        }
-
-        ros::spinOnce();
-        loop_rate.sleep();
-        lastLeftMotorOutput = left->value;
-        lastRightMotorOutput = right->value;
+    // Normalize to [-1, 1]
+    double s = std::max(std::abs(move), std::abs(rotate));
+    if (s > 1.0) {
+      move   /= s;
+      rotate /= s;
     }
-    return 0;
+
+    if (move > 0.0) {
+      if (rotate > 0.0) {
+        left_out_  = move - rotate;
+        right_out_ = std::max(move, rotate);
+      } else {
+        left_out_  = std::max(move, -rotate);
+        right_out_ = move + rotate;
+      }
+    } else {
+      if (rotate > 0.0) {
+        left_out_  = -std::max(-move, rotate);
+        right_out_ = move + rotate;
+      } else {
+        left_out_  = move - rotate;
+        right_out_ = -std::max(-move, -rotate);
+      }
+    }
+  }
+
+  void publishLoop() {
+    // Rate limit changes
+    double left_cmd  = clampDelta(last_left_out_,  left_out_,  max_delta_);
+    double right_cmd = clampDelta(last_right_out_, right_out_, max_delta_);
+
+    ros_phoenix::msg::MotorControl left_msg;
+    left_msg.mode  = ros_phoenix::msg::MotorControl::PERCENT_OUTPUT;
+    left_msg.value = left_cmd;
+
+    ros_phoenix::msg::MotorControl right_msg;
+    right_msg.mode  = ros_phoenix::msg::MotorControl::PERCENT_OUTPUT;
+    right_msg.value = right_cmd;
+
+    // Publish based on control mode: 0=rear, 1=front, 2=both
+    if (control_mode_ == 1) {
+      pub_fl_->publish(left_msg);
+      pub_fr_->publish(right_msg);
+    } else if (control_mode_ == 0) {
+      pub_bl_->publish(left_msg);
+      pub_br_->publish(right_msg);
+    } else {
+      pub_fl_->publish(left_msg);
+      pub_bl_->publish(left_msg);
+      pub_fr_->publish(right_msg);
+      pub_br_->publish(right_msg);
+    }
+
+    last_left_out_  = left_cmd;
+    last_right_out_ = right_cmd;
+  }
+
+  static double clampDelta(double last, double target, double max_delta) {
+    const double diff = target - last;
+    if (std::abs(diff) <= max_delta) return target;
+    return last + std::copysign(max_delta, diff);
+  }
+
+  // Members
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
+  rclcpp::Publisher<ros_phoenix::msg::MotorControl>::SharedPtr pub_fl_, pub_fr_, pub_bl_, pub_br_;
+  rclcpp::TimerBase::SharedPtr timer_;
+
+  // State
+  int control_mode_ = 2; // 0=rear, 1=front, 2=both
+  double left_out_ = 0.0, right_out_ = 0.0;
+  double last_left_out_ = 0.0, last_right_out_ = 0.0;
+
+  // Params
+  double radius_{0.8};
+  double max_linear_speed_{2.5};
+  double max_angular_speed_{radius_ * max_linear_speed_};
+  double max_delta_{0.05};
+};
+
+int main(int argc, char** argv) {
+  rclcpp::init(argc, argv);
+  rclcpp::spin(std::make_shared<FalconMotorController>());
+  rclcpp::shutdown();
+  return 0;
 }
