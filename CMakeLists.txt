@@ -79,6 +79,7 @@ find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(sensor_msgs REQUIRED)  # NEW
+find_package(rcl_interfaces REQUIRED) 
 
 ## System dependencies
 find_package(Threads REQUIRED)

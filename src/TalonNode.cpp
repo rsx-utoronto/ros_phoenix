@@ -54,8 +54,8 @@ TalonNode::TalonNode(const rclcpp::Node::SharedPtr& node,
         else if (key == pfx + "i")                 { new_cfg.i = p.as_double(); changed = true; }
         else if (key == pfx + "d")                 { new_cfg.d = p.as_double(); changed = true; }
         else if (key == pfx + "f")                 { new_cfg.f = p.as_double(); changed = true; }
-        else if (key == pfx + "cont_current")      { new_cfg.cont_current = p.as_int(); changed = true; }
-        else if (key == pfx + "peak_current_dur")  { new_cfg.peak_current_dur = p.as_int(); changed = true; }
+        else if (key == pfx + "cont_current")      { new_cfg.cont_current = static_cast<int32_t>(p.as_int()); changed = true; }
+        else if (key == pfx + "peak_current_dur")  { new_cfg.peak_current_dur = static_cast<int32_t>(p.as_int()); changed = true; }
         else if (key == pfx + "brake_mode")        { new_cfg.brake_mode = p.as_bool(); changed = true; }
       }
 
@@ -69,9 +69,6 @@ TalonNode::TalonNode(const rclcpp::Node::SharedPtr& node,
       return result;
     });
 
-  talon.NeutralOutput();
-
-  // Optional: periodic update loop (50 Hz)
   update_timer_ = node_->create_wall_timer(
       std::chrono::milliseconds(20),
       std::bind(&TalonNode::update, this));
@@ -155,15 +152,13 @@ void TalonNode::configure()
 void TalonNode::update()
 {
   std::lock_guard<std::recursive_mutex> lock(mutex_);
-
-  // Configure if needed
   if (!configured_) {
     configure();
   }
 
-  // Watchdog: disable if no recent commands
   auto now = node_->get_clock()->now();
-  if ((now - last_update_) > rclcpp::Duration::from_seconds(0.2)) {
+  // Use a portable duration (0.2s)
+  if ((now - last_update_) > rclcpp::Duration(0, 200000000)) {
     if (!disabled_) {
       RCLCPP_WARN(node_->get_logger(), "Talon disabled for not receiving updates: %s", name_.c_str());
     }
