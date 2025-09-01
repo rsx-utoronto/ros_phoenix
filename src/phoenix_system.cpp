@@ -214,7 +214,7 @@ hardware_interface::return_type PhoenixSystem::stop()
     return hardware_interface::return_type::OK;
 }
 
-hardware_interface::return_type PhoenixSystem::read()
+hardware_interface::return_type PhoenixSystem::read(const rclcpp::Time& time, const rclcpp::Duration& period)
 {
     for (auto& joint : this->joints_) {
         *(joint.status) = *(joint.node->status());
@@ -222,7 +222,7 @@ hardware_interface::return_type PhoenixSystem::read()
     return hardware_interface::return_type::OK;
 }
 
-hardware_interface::return_type PhoenixSystem::write()
+hardware_interface::return_type PhoenixSystem::write(const rclcpp::Time& time, const rclcpp::Duration& period)
 {
     for (auto& joint : this->joints_) {
         joint.node->set(joint.control);

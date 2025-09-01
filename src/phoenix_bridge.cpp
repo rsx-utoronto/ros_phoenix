@@ -33,9 +33,9 @@ hardware_interface::return_type PhoenixBridge::configure(
     this->logger_ = rclcpp::get_logger(info.name);
     this->info_ = info;
 
-    if (configure_default(info) != hardware_interface::return_type::OK) {
-        return hardware_interface::return_type::ERROR;
-    }
+    // if (configure_default(info) != hardware_interface::return_type::OK) {
+    //     return hardware_interface::return_type::ERROR;
+    // }
 
     for (auto joint : info.joints) {
         auto cmd = std::make_shared<ros_phoenix::msg::MotorControl>();

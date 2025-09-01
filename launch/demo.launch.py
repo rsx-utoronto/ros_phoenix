@@ -1,6 +1,7 @@
 import launch
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
+from launch_ros.actions import Node
 
 
 def generate_launch_description():
@@ -16,28 +17,35 @@ def generate_launch_description():
                 package="ros_phoenix",
                 plugin="ros_phoenix::TalonSRX",
                 name="front_left",
-                parameters=[{"id": 15}],
+                parameters=[{"id": 4}],
             ),
             ComposableNode(
                 package="ros_phoenix",
                 plugin="ros_phoenix::TalonSRX",
                 name="front_right",
-                parameters=[{"id": 18}],
+                parameters=[{"id": 1}],
             ),
             ComposableNode(
                 package="ros_phoenix",
                 plugin="ros_phoenix::TalonSRX",
                 name="back_left",
-                parameters=[{"id": 10}],
+                parameters=[{"id": 6}],
             ),
             ComposableNode(
                 package="ros_phoenix",
                 plugin="ros_phoenix::TalonSRX",
                 name="back_right",
-                parameters=[{"id": 19}],
+                parameters=[{"id": 3}],
             ),
         ],
         output="screen",
     )
 
-    return launch.LaunchDescription([container])
+    return launch.LaunchDescription([container,
+                                     Node(
+                                         package="ros_phoenix",
+                                         executable="falcon_motor_control_node",
+                                         name="falcon_motor_control_node",
+                                         output="screen",
+                                         respawn=False
+                                     )])

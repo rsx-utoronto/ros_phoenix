@@ -70,8 +70,10 @@ endif()
 
 # Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 14)
+  set(CMAKE_CXX_STANDARD 17)
 endif()
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -149,6 +151,13 @@ ament_target_dependencies(phoenix_container
   "rclcpp_components")
 target_link_libraries(phoenix_container ${PROJECT_NAME}_components)
 
+add_executable(falcon_motor_control_node ${PROJECT_SOURCE_DIR}/src/falcon_motor_control.cpp)
+ament_target_dependencies(falcon_motor_control_node rclcpp std_msgs geometry_msgs sensor_msgs)
+target_include_directories(falcon_motor_control_node PUBLIC ${PROJECT_SOURCE_DIR}/include)
+rosidl_target_interfaces(falcon_motor_control_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+target_link_libraries(falcon_motor_control_node Threads::Threads ${PHOENIX_LIBRARIES})
+
 # Install Components
 install(TARGETS ${PROJECT_NAME}_components phoenix_container ${PROJECT_NAME}_control
   ARCHIVE DESTINATION lib
@@ -165,6 +174,11 @@ install(
 install(DIRECTORY
   launch
   DESTINATION share/${PROJECT_NAME}
+)
+
+install(TARGETS 
+  falcon_motor_control_node
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)

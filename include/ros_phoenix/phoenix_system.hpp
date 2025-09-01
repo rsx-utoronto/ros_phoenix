@@ -7,7 +7,11 @@
 #include "ros_phoenix/msg/motor_control.hpp"
 #include "ros_phoenix/msg/motor_status.hpp"
 
-#include "hardware_interface/base_interface.hpp"
+// #if __has_include("hardware_interface/components/base_interface.hpp")
+//   #include "hardware_interface/components/base_interface.hpp"
+// #else
+//   #include "hardware_interface/base_interface.hpp"
+// #endif
 #include "hardware_interface/system_interface.hpp"
 
 #include "rclcpp/logger.hpp"
@@ -20,8 +24,20 @@
 namespace ros_phoenix {
 
 class PhoenixSystem
-    : public hardware_interface::BaseInterface<hardware_interface::SystemInterface> {
+    : public hardware_interface::SystemInterface {
 public:
+    // hardware_interface::CallbackReturn on_init(const hardware_interface::HardwareInfo& info) override;
+
+    // std::vector<hardware_interface::StateInterface> export_state_interfaces() override
+    // std::vector<hardware_interface::CommandInterface> export_command_interfaces() override;
+
+    // hardware_interface::CallbackReturn on_configure(const rclcpp_lifecycle::State& previous_state) override;
+    // hardware_interface::CallbackReturn on_activate(const rclcpp_lifecycle::State& previous_state) override;
+    // hardware_interface::CallbackReturn on_deactivate(const rclcpp_lifecycle::State& previous_state) override;
+
+    hardware_interface::return_type read(const rclcpp::Time& time, const rclcpp::Duration& period) override;
+    hardware_interface::return_type write(const rclcpp::Time& time, const rclcpp::Duration& period) override;
+
     static const std::string PERCENT_OUTPUT;
     static const std::string POSITION;
     static const std::string VELOCITY;
@@ -44,9 +60,9 @@ public:
 
     hardware_interface::return_type stop();
 
-    hardware_interface::return_type read();
+    // hardware_interface::return_type read();
 
-    hardware_interface::return_type write();
+    // hardware_interface::return_type write();
 
 private:
     struct JointInfo {
