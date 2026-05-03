@@ -27,6 +27,40 @@ PhoenixBridge::PhoenixBridge()
 {
 }
 
+hardware_interface::CallbackReturn PhoenixBridge::on_init(
+    const hardware_interface::HardwareInfo& info)
+{
+    if (hardware_interface::SystemInterface::on_init(info) != hardware_interface::CallbackReturn::SUCCESS) {
+        return hardware_interface::CallbackReturn::ERROR;
+    }
+
+    return configure(info) == hardware_interface::return_type::OK
+        ? hardware_interface::CallbackReturn::SUCCESS
+        : hardware_interface::CallbackReturn::ERROR;
+}
+
+hardware_interface::CallbackReturn PhoenixBridge::on_configure(
+    const rclcpp_lifecycle::State&)
+{
+    return hardware_interface::CallbackReturn::SUCCESS;
+}
+
+hardware_interface::CallbackReturn PhoenixBridge::on_activate(
+    const rclcpp_lifecycle::State&)
+{
+    return start() == hardware_interface::return_type::OK
+        ? hardware_interface::CallbackReturn::SUCCESS
+        : hardware_interface::CallbackReturn::ERROR;
+}
+
+hardware_interface::CallbackReturn PhoenixBridge::on_deactivate(
+    const rclcpp_lifecycle::State&)
+{
+    return stop() == hardware_interface::return_type::OK
+        ? hardware_interface::CallbackReturn::SUCCESS
+        : hardware_interface::CallbackReturn::ERROR;
+}
+
 hardware_interface::return_type PhoenixBridge::configure(
     const hardware_interface::HardwareInfo& info)
 {
@@ -37,18 +71,18 @@ hardware_interface::return_type PhoenixBridge::configure(
     //     return hardware_interface::return_type::ERROR;
     // }
 
-    for (auto joint : info.joints) {
+    for (const auto& joint : info.joints) {
         auto cmd = std::make_shared<ros_phoenix::msg::MotorControl>();
 
         if (joint.command_interfaces.size() != 1) {
-            RCLCPP_FATAL(this->logger_, "Joint '%s' has %d command interfaces. Expected 1.",
+            RCLCPP_FATAL(this->logger_, "Joint '%s' has %zu command interfaces. Expected 1.",
                 joint.name.c_str(), joint.command_interfaces.size());
             return hardware_interface::return_type::ERROR;
         }
         InterfaceType cmd_interface = str_to_interface(joint.command_interfaces[0].name);
         if (cmd_interface == InterfaceType::INVALID) {
             RCLCPP_FATAL(this->logger_, "Joint '%s' has an invalid command interface: %s",
-                joint.name.c_str(), joint.command_interfaces[0].name);
+                joint.name.c_str(), joint.command_interfaces[0].name.c_str());
             return hardware_interface::return_type::ERROR;
         }
         cmd->mode = cmd_interface;
@@ -56,13 +90,13 @@ hardware_interface::return_type PhoenixBridge::configure(
         for (auto state_inter : joint.state_interfaces) {
             if (str_to_interface(state_inter.name) == InterfaceType::INVALID) {
                 RCLCPP_FATAL(this->logger_, "Joint '%s' has an invalid state interface: %s",
-                    joint.name.c_str(), state_inter.name);
+                    joint.name.c_str(), state_inter.name.c_str());
                 return hardware_interface::return_type::ERROR;
             }
         }
 
         this->hw_cmd_.push_back(cmd);
-        this->hw_status_.push_back(std::make_unique<ros_phoenix::msg::MotorStatus>());
+        this->hw_status_.push_back(std::make_shared<ros_phoenix::msg::MotorStatus>());
     }
 
     return hardware_interface::return_type::OK;
@@ -143,12 +177,26 @@ hardware_interface::return_type PhoenixBridge::read()
     return hardware_interface::return_type::OK;
 }
 
+hardware_interface::return_type PhoenixBridge::read(
+    const rclcpp::Time&,
+    const rclcpp::Duration&)
+{
+    return read();
+}
+
 hardware_interface::return_type PhoenixBridge::write()
 {
     for (auto i = 0u; i < this->info_.joints.size(); i++) {
         this->publishers_[i]->publish(*(this->hw_cmd_[i]));
     }
     return hardware_interface::return_type::OK;
+}
+
+hardware_interface::return_type PhoenixBridge::write(
+    const rclcpp::Time&,
+    const rclcpp::Duration&)
+{
+    return write();
 }
 
 } // namespace ros_phoenix
