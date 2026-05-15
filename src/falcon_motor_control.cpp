@@ -18,7 +18,7 @@ public:
     // Params (tunable)
     radius_            = this->declare_parameter<double>("radius", 0.8);
     max_linear_speed_  = this->declare_parameter<double>("max_linear_speed", 2.5);
-    max_delta_         = this->declare_parameter<double>("max_delta", 0.03);
+    max_delta_         = this->declare_parameter<double>("max_delta", 0.02);
 
     max_angular_speed_ = max_linear_speed_ * radius_;
 
@@ -136,7 +136,7 @@ private:
   double radius_{0.8};
   double max_linear_speed_{2.5};
   double max_angular_speed_{radius_ * max_linear_speed_};
-  double max_delta_{0.03};
+  double max_delta_{0.02};
 };
 
 int main(int argc, char** argv) {
